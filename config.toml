@@ -1,0 +1,266 @@
+baseURL = "http://wen-nan.github.io"
+# [en, zh-cn, fr, ...] 设置默认的语言
+defaultContentLanguage = "zh-cn"
+# 网站语言, 仅在这里 CN 大写
+languageCode = "zh-CN"
+# 是否包括中日韩文字
+hasCJKLanguage = true
+# 网站标题
+title = "NarcissusBlog"
+
+# 更改使用 Hugo 构建网站时使用的默认主题
+theme = "LoveIt"
+
+[params]
+  # LoveIt 主题版本
+  version = "0.2.X"
+  # 网站默认主题 ("light", "dark", "auto")
+  defaultTheme = "auto"
+  # 日期格式
+  dateFormat = "2006-01-02"
+
+  # 文章页面的分享信息设置
+  [params.page.share]
+    enable = true
+    Weibo = true
+    Baidu = true
+    Twitter = true
+    Facebook = true
+
+  # 应用图标配置
+  [params.app]
+    # 当添加到 iOS 主屏幕或者 Android 启动器时的标题, 覆盖默认标题
+      title = "NarcissusBlog"
+      # 是否隐藏网站图标资源链接
+      noFavicon = false
+      # 更现代的 SVG 网站图标, 可替代旧的 .png 和 .ico 文件
+      svgFavicon = ""
+      # Android 浏览器主题色
+      themeColor = "#ffffff"
+      # Safari 图标颜色
+      iconColor = "#5bbad5"
+      # Windows v8-10 磁贴颜色
+      tileColor = "#da532c"
+
+  # Home page config
+  [params.home]
+    # RSS 文章数目
+    rss = 10
+    [params.home.profile]
+      enable = true
+      # Gravatar 邮箱，用于优先在主页显示的头像
+      gravatarEmail = ""
+      # 主页显示头像的 URL
+      avatarURL = "/logo.png"
+      # 主页显示的网站标题 (支持 HTML 格式)
+      title = "Narcissus的博客"
+      # 主页显示的网站副标题
+      subtitle = "赵子龙一身是<font color=\"green\">胆</font>，程序猿遍体皆<font color=\"red\">肝</font>"
+      # 是否为副标题显示打字机动画
+      typeit = true
+      # 是否显示社交账号
+      social = true
+      # 免责声明 (支持 HTML 格式)
+      disclaimer = ""
+    # 主页文章列表
+    [params.home.posts]
+      enable = true
+      # 主页每页显示文章数量
+      paginate = 5
+    # 主页的社交信息设置
+    [params.social]
+      GitHub = "wen-nan"
+      Weibo = "dengzhicheng123"
+      Zhihu = "qian-ye-53-94"
+      Douban = "161709992"
+      Youtubelegacy = "/"
+      Bilibili = "117448860"
+      Email = "1044532074@qq.com"
+
+  # 搜索配置
+  [params.search]
+    enable = false
+    # 搜索框的占位提示语
+    placeholder = ""
+
+
+  # 页面头部导航栏配置
+  [params.header]
+    # 桌面端导航栏模式 ("fixed", "normal", "auto")
+    desktopMode = "fixed"
+    # 移动端导航栏模式 ("fixed", "normal", "auto")
+    mobileMode = "auto"
+    # 页面头部导航栏标题配置
+    [params.header.title]
+      # URL of the LOGO
+      # LOGO 的 URL
+      logo = "/mechanic.png"
+      # title name
+      # 标题名称
+      name = "NarcissusBlog"
+      # 是否为标题显示打字机动画
+      typeit = false
+
+  # 页面底部信息配置
+  [params.footer]
+    enable = true
+    # Custom content (HTML format is supported)
+    # 自定义内容 (支持 HTML 格式)
+    custom = ''
+    # whether to show Hugo and theme info
+    # 是否显示 Hugo 和主题信息
+    hugo = true
+    # whether to show copyright info
+    # 是否显示版权信息
+    copyright = true
+    # whether to show the author
+    # 是否显示作者
+    author = true
+    # site creation time
+    # 网站创立年份
+    since = 2021
+    # ICP info only in China (HTML format is supported)
+    # ICP 备案信息，仅在中国使用 (支持 HTML 格式)
+    icp = ""
+    # 许可协议信息 (支持 HTML 格式)
+    license= '<a rel="license external nofollow noopener noreffer" href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank">CC BY-NC 4.0</a>'
+
+  # List (目录或标签) 页面配置
+  [params.list]
+    # special amount of posts in each list page
+    # list 页面每页显示文章数量
+    paginate = 20
+    # date format (month and day)
+    # 日期格式 (月和日)
+    dateFormat = "01-02"
+    # amount of RSS pages
+    # RSS 文章数目
+    rss = 10
+
+  # TypeIt 配置
+  [params.typeit]
+    # typing speed between each step (measured in milliseconds)
+    # 每一步的打字速度 (单位是毫秒)
+    speed = 100
+    # blinking speed of the cursor (measured in milliseconds)
+    # 光标的闪烁速度 (单位是毫秒)
+    cursorSpeed = 1000
+    # character used for the cursor (HTML format is supported)
+    # 光标的字符 (支持 HTML 格式)
+    cursorChar = "|"
+    # cursor duration after typing finishing (measured in milliseconds, "-1" means unlimited)
+    # 打字结束之后光标的持续时间 (单位是毫秒, "-1" 代表无限大)
+    duration = -1
+
+  # 目录配置
+    [params.page.toc]
+      # whether to enable the table of the contents
+      # 是否使用目录
+      enable = true
+      # whether to keep the static table of the contents in front of the post
+      # 是否保持使用文章前面的静态目录
+      keepStatic = false
+      # whether to make the table of the contents in the sidebar automatically collapsed
+      # 是否使侧边目录自动折叠展开
+      auto = true
+
+
+  # 评论系统设置
+  [params.page.comment]
+    enable = true
+    # Gitalk 评论系统设置 (https://github.com/gitalk/gitalk)
+    [params.page.comment.gitalk]
+      enable = false # 禁用本地gitalk
+      use = true
+      owner = "wen-nan"
+      admin = "wen-nan"
+      repo = "wen-nan.github.io"
+      clientId = "60afa8aa721493fdc40a"
+      clientSecret = "0d83669766bc4d55f49702f8d22e76215dfb373a"
+      id = "location.pathname" # The unique id of the page.
+      labels = "gitalk" # Github issue labels. If you used to use Gitment, you can change it
+      perPage = 15 # Pagination size, with maximum 100.
+      pagerDirection = "last" # Comment sorting direction, available values are 'last' and 'first'.
+      createIssueManually = false # If it is 'false', it is auto to make a Github issue when the administrators login.
+      distractionFreeMode = false # Enable hot key (cmd|ctrl + enter) submit comment.
+
+
+[menu]
+  [[menu.main]]
+    identifier = "posts"
+    # 你可以在名称 (允许 HTML 格式) 之前添加其他信息, 例如图标
+    pre = "<i class=\"fa fa-fw fa-bars\"></i>"
+    # 你可以在名称 (允许 HTML 格式) 之后添加其他信息, 例如图标
+    post = ""
+    name = "全部文章"
+    url = "/posts/"
+    # 当你将鼠标悬停在此菜单链接上时, 将显示的标题
+    title = "全部文章"
+    weight = 1
+  [[menu.main]]
+    identifier = "categories"
+    pre = "<i class=\"fas fa-fw fa-th\"></i>"
+    post = ""
+    name = "分类"
+    url = "/categories/"
+    title = "分类"
+    weight = 2
+  [[menu.main]]
+    identifier = "tags"
+    pre = "<i class=\"fas fa-fw fa-tag\"></i>"
+    post = ""
+    name = "标签"
+    url = "/tags/"
+    title = "标签"
+    weight = 3
+  [[menu.main]]
+    identifier = "documents"
+    pre = "<i class='fas fa-fw fa-fan fa-spin'></i>"
+    post = ""
+    name = "文档"
+    url = ""
+    title = "文档"
+    weight = 4
+  [[menu.main]]
+    identifier = "about"
+    pre = "<i class=\"fas fa-fw fa-at\"></i>"
+    post = ""
+    name = "关于"
+    url = "/about/"
+    title = "关于"
+    weight = 5
+  [[menu.main]]
+    identifier = "github"
+    pre = "<i class='fab fa-github fa-fw'></i>"
+    post = ""
+    name = ""
+    url = "https://github.com/wen-nan"
+    title = "GitHub"
+    weight = 6
+
+  # 二级菜单
+  [[menu.main]]
+    parent = "documents"
+    pre = "<i class='fa fa-thumbs-up'></i>"
+    name = "Hugo文档"
+    identifier = "hugo"
+    url = "https://gohugo.io/documentation/"
+    weight = 1
+    # 新窗口打开链接
+    post = "_blank"
+
+# Hugo 解析文档的配置
+[markup]
+  # 语法高亮设置 (https://gohugo.io/content-management/syntax-highlighting)
+  [markup.highlight]
+    # false 是必要的设置 (https://github.com/dillonzq/LoveIt/issues/158)
+    noClasses = false
+
+  # 目录设置
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 6
+
+# 作者配置
+[author]
+  name = "Narcissus"
