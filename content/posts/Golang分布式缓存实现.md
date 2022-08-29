@@ -1,7 +1,8 @@
 ---
 author: "Narcissus"
 title: "Golang实现分布式缓存"
-date: "2022-03-07"
+date: "2022-08-29"
+lastmod: "2022-08-29"
 description: "使用Golang实现一个简单的分布式缓存系统。"
 tags: ["Golang", "分布式缓存"]
 categories: ["Golang"]
@@ -44,6 +45,12 @@ groupcache没有set、update、delete接口只是让用户无法更新和删除�
 针对第二点，某些key属于热点数据而被大量访问，这会导致压力全部都在某个节点上。
 
 **groupcache有一个热点数据自动扩展机制来解决这个问题，针对每个节点，除了会缓存本节点存在且大量访问的key之外，也会缓存那些不属于节点的(但是被频繁访问)的key。**
+
+
+
+实现方式上：每一个缓存节点（Group）有两个缓存实体：mainCache、hotCache。mainCache主要用来存放应该存放在本缓存节点的数据。hotCache用来存放热点数据，**实现上：每次从其他缓存节点获取数据后，都有一定的概率将该数据存放到hotCache中供下一次调用，减少了HTTP通信。** mianCache和hotCache的缓存大小比例是8:1的比例。即需要驱逐旧数据的时候，判断`hotBytes > mainBytes/8` 如果成立则驱逐hotCache，否则驱逐mianCache。
+
+> 一定概率是指：目前采用比较简单的方式实现，即`rand.Intn(10) == 0` 则将key/value存储在改group中的hotCache中。 可以使用MinutesQPS或者更好的方式来选择是否缓存热点数据。
 
 ## 概述
 
