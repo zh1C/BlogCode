@@ -1,7 +1,8 @@
 ---
 author: "Narcissus"
 title: "Golang源码之常见控制结构实现原理"
-date: "2022-02-13"
+date: "2022-07-16"
+lastmod: "2022-07-16"
 description: "Go语言专家编程书籍阅读笔记，常见控制结构的源码阅读。"
 tags: ["Golang"]
 categories: ["Golang"]
