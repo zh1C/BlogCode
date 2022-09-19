@@ -73,4 +73,66 @@ Mutex.state的类型是int32，
 
 
 
-Go语言的Mutex就是这样实现的，
+Go语言的Mutex就是这样实现的，不过这不适合协程，如果协程等待，还需要切换线程，就不太适合了。那么协程要等待一个锁，要如何休眠、等待和唤醒呢？
+
+​		这需要runtime.semaphore来实现，这是可供协程使用的信号量。runtime内部会通过一个大小为251的semaTable来管理所有的semaphore。怎么通过固定大小来管理执行阶段数量不定的semaphore呢？
+
+大致思路是，semaTable存储的是251棵平衡二叉树的根，平衡树中每一个节点都是一个sudog类型的对象。要使用一个信号量时，需要提供一个记录信号量数值的变量，根据地址进行计算映射到semaTable中的一棵平衡树上，找到对应节点就找到了该信号量的等待队列。
+
+![image-20220919194845098](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220919194845098.png)
+
+## 2. GMP模型
+
+一个Hello World程序编译成可执行文件，执行时可执行文件被加载到内存中。
+
+​		对于进程虚拟地址空间中的代码段，我们感兴趣的是程序执行入口，他并不是我们熟悉的main.main,不同平台下的程序入口不同，再进行一系列检查与初始化等准备工作后，会以runtime.main为执行入口创建main goroutine，main goroutine执行起来后才会调用我们编写的main.main。
+
+​		再来看数据段，这里有几个重要的全局变量，我们知道Go语言中协程对应的数据结构是runtime.g，工作线程对应的数据结构是runtime.m:
+
+- 全局变量g0：主协程对应的g。与其他协程不同，它的栈是在主线程栈上分配的。
+- 全局变量m0,就是主线程对应的m
+
+> g0持有m0的指针，m0里也记录了g0的指针。并且一开始m0上执行的协程就是g0。
+
+- allgs记录了所有的g
+- allm记录了所有的m
+- sched(调度器)，用于保存空闲的m,空闲的p,全局队列等
+- allp用于保存所有的p，在程序初始化时会进行调度器初始化，同时会根据GOMAXPROCS这个环境变量决定创建多少个P
+
+> 同时会将第一个P和m0关联起来
+
+![image-20220919222549888](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220919222549888.png)
+
+### GM模型
+
+最初Go语言模型调度只有G和M，所有的待执行的G都等在一处，每个M来这里获取一个G时都要加锁，多个M分担多个G的执行任务，**就会因为频繁加锁和解锁而发生等待，影响程序并发性能。** 
+
+![image-20220919221000015](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220919221000015.png)
+
+### GMP模型
+
+所以后面又引入了P，对应的数据结构是runtime.p，它有一个本地的runq。这样只要把一个M关联到一个P，这个M就可以从P这里直接获取待执行的G，不用每次都和众多M从一个全局队列中争抢任务了。但仍然有一个全局runq，保存在全局变量sched(调度器)中，对应数据结构是runtime.schedt,里面记录了所有空闲的m和空闲的p。
+
+![image-20220919221707886](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220919221707886.png)
+
+​	如果P的本地队列已满，则等待执行的G会被放到全局队列里面，而M会先从关联的P的本地队列runq中获取等待执行的G，没有的话再到调度器持有的全局队列里获取一些任务，如果全局队列里面也没有G，则会从别的P哪里窃取一些G过来。
+
+
+
+GPM关系如下，main goroutine创建之后，会被加入到当前P的本地队列里面，然后通过mstart函数开启调度循环，**这个mstart是所有工作线程的入口，主要是调用schedule函数，也就是执行调度循环。**因此对于某个活跃的M而言，不是在执行某个G，就是在执行调度程序获取某个G。因为队列里面只有main goroutine等待执行，所以m0切换到main goroutine，执行入口则是runtime.main.
+
+Runtime.main会做很多事，包括创建监控线程，进行包初始化等，也包括调用熟悉的mian.mian。则会输出hello world。最后在main.main返回时，runtime.main会调用exit()函数结束进程。
+
+![image-20220919223406184](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220919223406184.png)
+
+
+
+改变函数例子，使用协程来输出hello, world，这样调用过程又是什么样呢？
+
+我们通过go关键字创建协程，会通过编译器转换为newproc函数调用，当然main goroutine也是通过newproc函数创建。创建goroutine时只负责指定入口、参数，而newproc会给goroutine构造一个栈帧，目的是让协程任务结束后，返回到goexit函数中，进行协程资源回收处理等工作。
+
+如果设置GOMAXPROCS只创建一个P，新创建的hello goroutine被添加到当前P的本地队列runq中，然后main.main就结束返回了，再然后exit()函数被调用，进程就结束了。所以hello goroutine没有被执行。
+
+如果想hello goroutine被执行，就要留住时间，可以使用time.Sleep函数，实际上会调用gopark函数将当前协程状态从_Grunning修改为Gwaiting，则main goroutine不会回到当前P的runq中，而是在timer中等待。继而调用schedule进行调度，hello goroutine得到调度执行。等到Sleep时间到达后，timer会把main goroutine重新 _Grunnable状态，放回到P的runq中，最后等到被调用结束程序。
+
+![image-20220919224545995](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220919224545995.png)
