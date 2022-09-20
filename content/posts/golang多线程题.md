@@ -2,6 +2,7 @@
 author: "Narcissus"
 title: "Golang多线程题目"
 date: "2022-02-25"
+Lastmode: "2022-02-25"
 description: "Go语言多线程相关的LeetCode题目。"
 tags: ["Golang", "面试"]
 categories: ["Golang"]
@@ -271,6 +272,88 @@ func main() {
 	chanZero <- struct{}{}
 	wg.Wait()
 	fmt.Println()
+}
+```
+
+交替打印奇数和偶数，一个管道实现方式：
+
+```go
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+var flagChan  = make(chan int)
+var wg = &sync.WaitGroup{}
+
+func odd() {
+	defer wg.Done()
+	for i := 1; i <= 100; i++ {
+		flagChan <- 1
+		if i&1 == 1 {
+			fmt.Println(i)
+		}
+	}
+}
+
+func even() {
+	defer wg.Done()
+	for i := 1; i <= 100; i++ {
+		<- flagChan
+		if i&1 == 0 {
+			fmt.Println(i)
+		}
+	}
+}
+
+func main() {
+  defer close(flageChan)
+	wg.Add(2)
+	go odd()
+	go even()
+	wg.Wait()
+}
+
+```
+
+## 四匹马赛跑问题
+
+四匹马同时出发，每100m打印一个输出，1000m结束。
+
+```go
+var (
+	wg   = sync.WaitGroup{}
+	cond = sync.NewCond(&sync.Mutex{})
+)
+
+func print(number int) {
+	defer wg.Done()
+	fmt.Println(number, "号已经就位")
+	// 调用 Wait 会自动释放锁 c.L，并挂起调用者所在的 goroutine，
+	// 因此当前协程会阻塞在 Wait 方法调用的地方。
+	// 如果其他协程调用了 Signal 或 Broadcast 唤醒了该协程，
+	// 那么 Wait 方法在结束阻塞时，会重新给 c.L 加锁，并且继续执行 Wait 后面的代码。
+	cond.L.Lock()
+	cond.Wait()
+	cond.L.Unlock()
+	for i := 1; i <= 10; i++ {
+		time.Sleep(time.Second)
+		fmt.Printf("%d号马跑了%d米\n", number, i*100)
+	}
+}
+
+func main() {
+	wg.Add(4)
+	for i := 1; i <= 4; i++ {
+		go print(i)
+	}
+
+	time.Sleep(time.Second)
+	// 开始跑
+	cond.Broadcast()
+	wg.Wait()
 }
 ```
 
