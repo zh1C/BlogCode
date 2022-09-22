@@ -346,3 +346,244 @@ Go语言的GC在准备阶段会为每一个P创建一个mark work协程，把对
 - sysmon
 
 监控线程的一个任务就是强制执行GC，runtime包初始化时会开启一个协程，监控线程在检测到距离上一次GC已经超过指定时间时，就会把该协程添加到runq中，等待得到调度执行。
+
+## 全CPU采集
+
+### 问题
+
+假设有如下的一段代码：
+
+```go
+func main() {
+	for {
+		// Http request to a web service that might be slow.
+		slowNetworkRequest()
+		// Some heavy CPU computation.
+		cpuIntensiveTask()
+		// Poorly named function that you don't understand yet.
+		weirdFunction()
+	}
+}
+```
+
+使用pprof的profile采集的火焰图如下所示：
+![image-20220922090400054](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220922090400054.png)
+
+可以看到所有时间消耗都在cpuIntensiveTask任务上，而我们通过简单的统计时间方式可以得到如下效果：
+
+![image-20220922091254594](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220922091254594.png)
+
+> profile的采集原理是，系统1s内发送100次信号，信号将会中断当前线程，并记录当前线程的堆栈。
+>
+> 出现上述情况是因为profile的采集是On-CPU的，等待I/O所花费的时间被隐藏了。由于 Go 使用非阻塞 I/O，等待 I/O 的 Goroutines 被停放并且不在任何线程上运行。因此，它们最终对 Go 的内置 CPU 分析器基本上是不可见的。
+
+而使用fgprof，则三个函数的消耗就可以显示：
+
+![image-20220922092820005](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220922092820005.png)
+
+### 原理
+
+原理是后台启动了一个goroutine，每秒99次唤醒99次调用`runtime.GoroutineProfile`函数，这个函数将返回所有当前的goroutine与他们的调用栈，不管他们是On/Off CPU状态。但是开销将会随着活动的goroutine的增加而增加，当服务小于1000goroutine的时候，无须担心，但是当goroutine数量达到10k或者更多的时候，开销将会很大。
+
+> `func GoroutineProfile(p []StackRecord) (n int, ok bool)`
+>
+> GoroutineProfile 返回 n，即活动 goroutine 堆栈配置文件中的记录数。如果 len(p) >= n，GoroutineProfile 将 profile 复制到 p 并返回 n，true。如果 len(p) < n，GoroutineProfile 不会改变 p 并返回 n，false。
+>
+> `runtime.StackRecord`用于描述单个执行堆栈。结构为[32]uintptr，记录的是程序计数器PC的值，所以调用栈追踪深度为32，不清楚的调用栈函数为0，如下是一条StackRecord记录：
+>
+> `[4299802552 4299802509 4299802384 4299446240 4299614708 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]`
+
+由于并不知道会有多少runtime.StackRecord记录数，所以采用动态增长切片长度的方式，先使用长度为0的切片去调用，然后runtime.GoroutineProfile会返回记录数，然后动态增加1.1*n去获取记录，因为这期间可能增加了goroutine。
+
+![image-20220922100428655](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220922100428655.png)
+
+然后将每一次唤醒获取的记录进行合并，采用map的数据结构，存储到结构体wallclockProfile.stacks中。同时ignore中存储当前函数的栈帧，用户后面忽略统计函数的调用栈。
+
+Runtime.Frame包含函数名，函数所在文件、行号等信息，如下所示：
+
+```go
+type Frame struct {
+    // PC is the program counter for the location in this frame.
+    // For a frame that calls another frame, this will be the
+    // program counter of a call instruction. Because of inlining,
+    // multiple frames may have the same PC value, but different
+    // symbolic information.
+    PC uintptr
+
+    // Func is the Func value of this call frame. This may be nil
+    // for non-Go code or fully inlined functions.
+    Func *Func
+
+    // Function is the package path-qualified function name of
+    // this call frame. If non-empty, this string uniquely
+    // identifies a single function in the program.
+    // This may be the empty string if not known.
+    // If Func is not nil then Function == Func.Name().
+    Function string
+
+    // File and Line are the file name and line number of the
+    // location in this frame. For non-leaf frames, this will be
+    // the location of a call. These may be the empty string and
+    // zero, respectively, if not known.
+    File string
+    Line int
+
+    // Entry point program counter for the function; may be zero
+    // if not known. If Func is not nil then Entry ==
+    // Func.Entry().
+    Entry uintptr
+    // contains filtered or unexported fields
+}
+```
+
+![image-20220922102411065](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220922102411065.png)
+
+记录已经存在就count++,没有就创建一个记录，并获取这条调用栈的函数名、文件名、行号等信息存入frames的切片中。
+
+![image-20220922185413286](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220922185413286.png)
+
+最后将wallclockProfile结构体转换成profile.Profile结构体即可展示火焰图。先将map的调用栈转换成切片形式，同时去忽略本函数栈帧。转换过程中将count*10ms（1s/hz），就表示成了消耗时间。
+
+```go
+func (p *wallclockProfile) exportPprof(hz int, startTime, endTime time.Time) *profile.Profile {
+	prof := &profile.Profile{}
+	m := &profile.Mapping{ID: 1, HasFunctions: true}
+	prof.Period = int64(1e9 / hz) // Number of nanoseconds between samples.
+	prof.TimeNanos = startTime.UnixNano()
+	prof.DurationNanos = int64(endTime.Sub(startTime))
+	prof.Mapping = []*profile.Mapping{m}
+	prof.SampleType = []*profile.ValueType{
+		{
+			Type: "samples",
+			Unit: "count",
+		},
+		{
+			Type: "time",
+			Unit: "nanoseconds",
+		},
+	}
+	prof.PeriodType = &profile.ValueType{
+		Type: "wallclock",
+		Unit: "nanoseconds",
+	}
+
+	type functionKey struct {
+		Name     string
+		Filename string
+	}
+	funcIdx := map[functionKey]*profile.Function{}
+
+	type locationKey struct {
+		Function functionKey
+		Line     int
+	}
+	locationIdx := map[locationKey]*profile.Location{}
+	for _, ws := range p.exportStacks() {
+		sample := &profile.Sample{
+			Value: []int64{
+				int64(ws.count),
+				int64(1000 * 1000 * 1000 / hz * ws.count),
+			},
+		}
+
+		for _, frame := range ws.frames {
+			fnKey := functionKey{Name: frame.Function, Filename: frame.File}
+			function, ok := funcIdx[fnKey]
+			if !ok {
+				function = &profile.Function{
+					ID:         uint64(len(prof.Function)) + 1,
+					Name:       frame.Function,
+					SystemName: frame.Function,
+					Filename:   frame.File,
+				}
+				funcIdx[fnKey] = function
+				prof.Function = append(prof.Function, function)
+			}
+
+			locKey := locationKey{Function: fnKey, Line: frame.Line}
+			location, ok := locationIdx[locKey]
+			if !ok {
+				location = &profile.Location{
+					ID:      uint64(len(prof.Location)) + 1,
+					Mapping: m,
+					Line: []profile.Line{{
+						Function: function,
+						Line:     int64(frame.Line),
+					}},
+				}
+				locationIdx[locKey] = location
+				prof.Location = append(prof.Location, location)
+			}
+			sample.Location = append(sample.Location, location)
+		}
+		prof.Sample = append(prof.Sample, sample)
+	}
+	return prof
+}
+```
+
+> Profile结构体中，每一条调用栈存入Sampling切片中，记录了调用次数和转换的时间，同时映射到一个Location结构体，Location中存储了函数相关信息，包括行号与Function结构体，Function中存储函数相关信息。同时profile中也有Location结构体切片。
+
+![image-20220922185646202](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220922185646202.png)
+
+### 缺陷
+
+内部的C函数并不会被跟踪，因为原理是采集goroutine的情况,并不会跟踪C的函数。
+
+Goroutine分析可以捕获的最大调用栈深度是32。如果调用栈深度超过，将会被截断，也就意味着将错过调用栈中导致采样处于活动状态的函数部分。
+
+### goroutine采样原理
+
+#### 1、概述
+
+Go runtime 在一个名为[allgs](https://github.com/golang/go/blob/3a778ff50f7091b8a64875c8ed95bfaacf3d334c/src/runtime/proc.go#L500)的简单切片中保存了所有的goroutine。包含了活着和死去的goroutine。死去的goroutine被保留用于新的goroutine产生的时候复用。
+
+Go runtime 中有提供API来追踪allgs中存活的goroutine及其堆栈等各种信息。一些API也能提供统计各种信息的功能。
+
+尽管API之间存在差异，但是存活的goroutine都有如下[基本](https://github.com/golang/go/blob/9b955d2d3fcff6a5bc8bce7bafdc4c634a28e95b/src/runtime/mprof.go#L729)[定义](https://github.com/golang/go/blob/9b955d2d3fcff6a5bc8bce7bafdc4c634a28e95b/src/runtime/traceback.go#L931)：
+
+- 没有[死亡](https://github.com/golang/go/blob/go1.15.6/src/runtime/runtime2.go#L65-L71)
+
+- 不是[系统goroutine](https://github.com/golang/go/blob/9b955d2d3fcff6a5bc8bce7bafdc4c634a28e95b/src/runtime/traceback.go#L1013-L1021)也不是终结器goroutine
+
+总结来说，正在运行的goroutine以及等待I/O、锁、通道、调度等的goroutine都被认为是存活的goroutine。
+
+#### 2、声明
+
+Go中所有可用的Goroutine分析都一个O(N)时间复杂度的STW阶段（其中N是分配的goroutine的数量）。一个简单的[基准测试](https://github.com/felixge/fgprof/blob/fe01e87ceec08ea5024e8168f88468af8f818b62/fgprof_test.go#L35-L78)[表明](https://github.com/felixge/fgprof/blob/master/BenchmarkProfilerGoroutines.txt)，当使用 [runtime.GoroutineProfile() ](https://pkg.go.dev/runtime#GoroutineProfile)API 时，每个 goroutine 会停止大约 1µs。但是这个数字很可能会随着程序的平均堆栈深度、死去的 goroutine 的数量等因素而波动。
+
+因此，对延迟非常敏感并且使用活动数达数千个goroutine的程序，进行goroutine分析要谨慎。大多数不会产生大量 goroutine 并且可以容忍几毫秒的偶然额外延迟的应用程序在生产中的连续goroutine 分析应该没有问题。
+
+#### 3、goroutine属性
+
+Goroutines 有很多[属性](https://github.com/golang/go/blob/go1.15.6/src/runtime/runtime2.go#L406-L486)可以帮助调试 Go 应用程序。通过本文档后面描述的 API 不同程度地公开。
+
+- `goid`：goroutine的唯一id，主goroutine的id为1。
+
+- `atomicstatus` ：goroutine 的状态，以下之一：
+    - `idle`: 刚被分配
+    - `runnable` :在运行队列，等待被调度
+    - `running` :在操作系统线程上执行
+    - `syscall` :被系统调用阻塞
+    - `waiting` :由调度程序停放，参见`g.waitreason` 
+    - `dead` :刚刚退出或正在重新初始化
+    - `copystack` :当前正在移动堆栈
+    - `preempted` :只是抢占了自己
+
+- `waitreason` :goroutine处于等待状态的原因，例如：Sleep、channel操作、i/o、gc等
+
+- `waitsince` :goroutine进入等待或系统调用状态的大致时间戳，由等待开始后的第一个GC确定。
+
+- `lables` :一组可以附加到 goroutines 的键/值[分析器标签](https://rakyll.org/profiler-labels/)。
+
+- `stack trace` :当前正在执行的函数及其调用者。这表现为文件名、函数名和行号的纯文本输出或程序计数器地址 (pcs) 的片段。 🚧 研究更多细节，例如func/file/line 文本可以转换成 pcs 吗？
+
+- `gopc` :导致该 goroutine 被创建的 go ... 调用的程序计数器地址 (pc)。可以转换为文件、函数名和行号。
+
+- `lockedm` :这个 goroutine 被锁定的线程，如果有的话。
+
+#### 4、特征矩阵
+
+下面的功能矩阵通过各种 API 让您快速了解这些属性的当前可用性。
+
+![img](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/(null)-20220922192607181.(null))
