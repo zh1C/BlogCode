@@ -64,6 +64,12 @@ brew install --cask font-source-code-pro
 
 至此，准备工作已经完成，下面可以安装spacemacs了。选择vim模式、spacemacs模式安装即可，即默认模式安装。
 
+### 改键
+
+由于emacs中control键使用频繁，为了方便，建议将中/英切换键修改为control键
+
+![image-20220927133910018](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220927133910018.png)
+
 ### 常用配置修改
 
 - 显示行号
