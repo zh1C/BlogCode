@@ -2,7 +2,7 @@
 author: "Narcissus"
 title: "Emacs学习"
 date: "2022-09-25"
-lastmod: "2022-09-25"
+lastmod: "2022-10-04"
 description: "emacs上手学习，包括安装、配置等基础使用"
 tags: ["emacs"]
 categories: ["emacs"]
@@ -70,6 +70,12 @@ brew install --cask font-source-code-pro
 
 ![image-20220927133910018](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220927133910018.png)
 
+### github管理个人配置
+
+spacemacs的个人配置都在HOME目录下的`.spacemacs`文件中，所有的个人配置都在此文件中进行修改。如果想要使用Github管理此文件，则修改在HOME目录下建立`.spacemacs.d`目录，并且将`.spacemacs`文件移到该目录中，同时重命名为`init.el`即可。然后使用Git管理此文件。
+
+使用命令SPE g i 创建一个git仓库，然后按SPE g s可以看到文件的状态，然后使用SPE g c命令(后续还有操作，按提示操作即可)commit所有文件。
+
 ### 常用配置修改
 
 - 显示行号
@@ -79,3 +85,41 @@ brew install --cask font-source-code-pro
 - 显示时间
 
 在.spacemacs文件中搜索`dotspacemacs/user-config`选项，添加`(display-time-mode t)`表示显示时间配置。
+
+- 修改退出编辑快捷键
+
+使用vim风格时，快捷键`i` 是进入编辑状态，快捷键`esc`则是退出编辑，但是esc快捷键有一点麻烦，可以通过`evil-escape`来进行修改，在`.spacemacs`文件中(快捷键`SPC f e d`快速打开，`SPE f e R`重载配置)进行如下配置：
+
+```lisp
+(defun dotspacemacs/user-config ()
+  ;; ...
+  ;; Set escape keybinding to "jk"
+  (setq-default evil-escape-key-sequence "jk"))
+```
+
+- 关闭滚动条
+
+默认spacemacs打开了滚动条，通过如下设置关闭滚动条：
+`dotspacemacs-scroll-bar-while-scrolling t`
+
+- 高亮显示80行以后的字符
+
+目的是防止编程超过80行，在`user-config`中进行如下配置：
+`spacesmacs/toggle-highlight-long-lines-globally-on`
+
+## 三、常用快捷键
+
+### 光标移动快捷键
+
+| 快捷键    | 描述                                             |
+| --------- | :----------------------------------------------- |
+| `h`       | 左移光标                                         |
+| `j`       | 下移光标                                         |
+| `k`       | 上移光标                                         |
+| `l`       | 右移光标                                         |
+| `H`       | 移动光标到顶部                                   |
+| `L`       | 移动光标到底部                                   |
+| `SPC j 0` | 移动光标到行开始位置(并在前一个位置设置一个标记) |
+| `SPC j $` | 移动光标到行末尾位置(并在前一个位置设置一个标记) |
+
+  
