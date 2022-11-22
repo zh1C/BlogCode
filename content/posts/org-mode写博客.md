@@ -2,7 +2,7 @@
 title: "org mode写博客"
 description: "使用org mode和ox-hugo写博客."
 date: 2022-11-17T00:00:00+08:00
-lastmod: 2022-11-17T20:00:09+08:00
+lastmod: 2022-11-19T14:41:47+08:00
 tags: ["emacs"]
 categories: ["emacs"]
 draft: false
@@ -85,7 +85,7 @@ md文档YAML的元信息中包含date属性，这是来自于标题变成DONE状
 ## 实时预览 {#实时预览}
 
 如果编辑博客时，每一次更改想要在浏览器中看到修改效果，都需要先转换org文件到md文件，则会非常麻烦。因此需要实时预览，每次保存org文件后，hugo
-启动的服务端会自动更新改次变更。
+启动的服务端会自动更新该次变更。
 
 总共有如下两步:
 
