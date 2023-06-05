@@ -373,7 +373,7 @@ func main() {
 
 ![image-20220922091254594](https://narcissusblog-img.oss-cn-beijing.aliyuncs.com/uPic/file-2022-09/image-20220922091254594.png)
 
-> profile的采集原理是，系统1s内发送100次信号，信号将会中断当前线程，并记录当前线程的堆栈。
+> profile的采集原理是，系统1s内发送100次信号SIGPROF，信号到达时，Go会捕获该信号，调用信号处理函数去获取当前活跃的Goroutine的调用栈，即信号将会中断当前线程，并记录当前线程的堆栈。
 >
 > 出现上述情况是因为profile的采集是On-CPU的，等待I/O所花费的时间被隐藏了。由于 Go 使用非阻塞 I/O，等待 I/O 的 Goroutines 被停放并且不在任何线程上运行。因此，它们最终对 Go 的内置 CPU 分析器基本上是不可见的。
 
